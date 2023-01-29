@@ -18,13 +18,16 @@ const unsigned int SCR_WIDTH = 1200;
 const unsigned int SCR_HEIGHT = 500;
 
 const int lazerCount=3; // formula for this is (int)2/speed*spacingTime + 1 // max number of lazers that can fit
-float last_frame_time_ref=0;
-float cur_frame_time_ref=0;
-float speed=0;
-glm::mat4 config;
+float speed=0.2;
 glm::mat4 configs[lazerCount];
 const int spacingTime=4;  // spacingTime*speed >= length of lazer
-float renderTime;
+float renderTime; // time when the last lazer render happened
+int render_till=0; // keeps track of which lazer to render till initially, when all lazers are not configured
+int destroyLazer=0; // keeps track of which lazer to reuse and generate a new lazer config in its place
+float last_frame_time_ref=0;
+float cur_frame_time_ref=0;
+//glm::mat4 config;
+
 
 
 const char *vertexShaderSource = "#version 330 core\n"
@@ -41,6 +44,44 @@ const char *fragmentShaderSource = "#version 330 core\n"
     "{\n"
     "   FragColor = vec4(1.0,0.0,0.0,1.0);\n"
     "}\n\0";
+
+
+//generates a random configuration for a lazer and return the config matrix
+glm::mat4 generateRandomConfig()
+{
+    glm::mat4 randomConfig;
+    randomConfig = glm::mat4(1.0f);
+    float vertical_loc = (((float)rand()) / (RAND_MAX / 2) - 1);
+    float rot_angle = glm::radians((float)rand());
+    randomConfig = glm::translate(randomConfig, glm::vec3(1.0f, 1.0f * vertical_loc, 0.0f));
+    randomConfig = glm::rotate(randomConfig, rot_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+    return randomConfig;
+}
+
+
+// keeps the config array updated so the lazer render loop renders the correct lazers
+void updateConfigArray()
+{
+    // taking care of getting the lazerCount lazers on the screen intitially
+    if ((render_till < lazerCount) && ((glfwGetTime() - renderTime) >= spacingTime))
+    {
+        // making the config matrix
+        configs[render_till] = generateRandomConfig();
+        renderTime = glfwGetTime();
+        render_till++;
+    }
+    // the rest of the game
+    else if ((render_till >= lazerCount) && ((glfwGetTime() - renderTime) >= spacingTime))
+    {
+        destroyLazer = (destroyLazer % (lazerCount));
+        configs[destroyLazer] = generateRandomConfig();
+        renderTime = glfwGetTime();
+        destroyLazer++;
+    }
+}
+
+
+
 
 int main()
 {
@@ -117,7 +158,6 @@ int main()
     glDeleteShader(fragmentShader);
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
-    // length of one half of the lazer
     // ------------------------------------------------------------------
     float vertices[] = {
      0.05f,  0.0f, 0.0f,  // right
@@ -156,12 +196,9 @@ int main()
     // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
     glBindVertexArray(0); 
 
-    // meta data
+    // setting meta data
     last_frame_time_ref=glfwGetTime();
-    speed=0.2;
     srand(10);
-    int render_till=0;
-    int destroyLazer=0;
     renderTime=glfwGetTime();
 
 
@@ -180,45 +217,20 @@ int main()
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // draw our first triangle
+        
         glUseProgram(shaderProgram);
 
-        // taking care of getting the lazerCount lazers on the screen intitially
-        if((render_till < lazerCount) && ((glfwGetTime()-renderTime) >= spacingTime))
-        {
-            // making the config matrix
-            configs[render_till]=glm::mat4(1.0f);
-            float vertical_loc=(((float)rand())/(RAND_MAX/2) -1);
-            float rot_angle=glm::radians((float)rand());
-            configs[render_till]=glm::translate(configs[render_till],glm::vec3(1.0f,1.0f*vertical_loc,0.0f));
-            configs[render_till]=glm::rotate(configs[render_till],rot_angle,glm::vec3(0.0f,0.0f,1.0f));
-            renderTime=glfwGetTime();
-            render_till++;
-        }
-        // the rest of the game
-        else if((render_till>=lazerCount) && ((glfwGetTime()-renderTime) >= spacingTime))
-        {
-            destroyLazer=(destroyLazer%(lazerCount));
-            configs[destroyLazer]=glm::mat4(1.0f);
-            float vertical_loc=(((float)rand())/(RAND_MAX/2) -1);
-            float rot_angle=glm::radians((float)rand());
-            configs[destroyLazer]=glm::translate(configs[destroyLazer],glm::vec3(1.0f,1.0f*vertical_loc,0.0f));
-            configs[destroyLazer]=glm::rotate(configs[destroyLazer],rot_angle,glm::vec3(0.0f,0.0f,1.0f));
-            renderTime=glfwGetTime();
-            destroyLazer++;
-        }
+        updateConfigArray();
+
         cur_frame_time_ref=glfwGetTime();
         
         for(int i=0;i<render_till;i++)
         {
-
-    
+            // setting the lazer config
             unsigned int configLoc=glGetUniformLocation(shaderProgram,"lazerConfig");
             glUniformMatrix4fv(configLoc,1,GL_FALSE,glm::value_ptr(configs[i]));
 
-
-
-            
+            // setting the lazer mov matrix
             float timeDelta=(cur_frame_time_ref-last_frame_time_ref);
             glm::mat4 lazerMov=glm::mat4(1.0f);
             lazerMov=glm::translate(lazerMov,glm::vec3(-1.0f*timeDelta*speed,0.0f,0.0f));
@@ -226,12 +238,10 @@ int main()
             glUniformMatrix4fv(MovLoc,1,GL_FALSE,glm::value_ptr(lazerMov));
             
 
-            
-
-            glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+            glBindVertexArray(VAO); 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             
-            configs[i]=lazerMov*configs[i];
+            configs[i]=lazerMov*configs[i]; // updating configs (wrt to horizontal location)
         }
 
         last_frame_time_ref=cur_frame_time_ref;
