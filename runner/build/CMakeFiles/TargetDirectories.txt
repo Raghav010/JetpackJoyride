@@ -1,0 +1,9 @@
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/CMakeFiles/app.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/CMakeFiles/glad.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/CMakeFiles/edit_cache.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/CMakeFiles/rebuild_cache.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/libraries/glfw/CMakeFiles/edit_cache.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/libraries/glfw/CMakeFiles/rebuild_cache.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/libraries/glfw/src/CMakeFiles/glfw.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/libraries/glfw/src/CMakeFiles/edit_cache.dir
+/home/raghav/Documents/College/CG/opengl/jetpack_joyride/runner/build/libraries/glfw/src/CMakeFiles/rebuild_cache.dir

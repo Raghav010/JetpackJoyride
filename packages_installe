@@ -1,0 +1,10 @@
+FreeType-
+    - freetype-2.10.1.tar.gz(removed the folder at /usr/local)
+    - freetype-2.12.1.tar.gz
+
+
+    - sudo apt install xorg-dev
+    - sudo apt install libwayland-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
+    - sudo apt install libglew-dev
+    - pip install docwriter
+    - sudo apt-get install freeglut3-dev
