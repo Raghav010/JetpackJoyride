@@ -67,6 +67,9 @@ const char *fragmentShaderSource = "#version 330 core\n"
 
 
 
+
+
+
 // compiles and links together the shaders to create a shader program
 unsigned int createShadProgram(const char* vertexShaderS,const char* fragShaderS)
 {
@@ -217,6 +220,28 @@ void updateConfigArray()
 
 
 
+int checkSideColl(glm::vec3 edgePointa,glm::vec3 edgePointb,glm::vec3 colliderPoint,float accuracy)
+{
+    float total=glm::length(edgePointa-edgePointb);
+    float part1=glm::length(edgePointa-colliderPoint);
+    float part2=glm::length(edgePointb-colliderPoint);
+
+    if(((part1 + part2)-(total)) <= accuracy)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+
+
+
+
+
+
 
 
 
@@ -308,7 +333,7 @@ int main()
     srand(10);
     renderTime=glfwGetTime();
 
-
+    int count=0;
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -322,6 +347,42 @@ int main()
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         cur_frame_time_ref=glfwGetTime();
+
+        // check for collisions---------------------------------------------------------
+        // looping through all rendered lazers
+        int collided=0;
+        float accuracy=0.001;
+        glm::vec3 jpTop=glm::vec3(-0.7f,curr_y+0.5,0.0f);
+        glm::vec3 jpBottom=glm::vec3(-0.7f,curr_y-0.5,0.0f);
+        for(int i=0;i<render_till;i++)
+        {   
+            glm::vec3 currLTop=glm::vec3((configs[i]*glm::vec4(0.0f, 0.4f, 0.0f,1.0f)));
+            glm::vec3 currLBottom=glm::vec3((configs[i]*glm::vec4(0.0f, -0.4f, 0.0f,1.0f)));
+            glm::vec3 currLRight=glm::vec3((configs[i]*glm::vec4(0.05f,  0.0f, 0.0f,1.0f)));
+            glm::vec3 currLLeft=glm::vec3((configs[i]*glm::vec4(-0.05f,  0.0f, 0.0f,1.0f)));
+
+            if(checkSideColl(currLTop,currLLeft,jpTop,accuracy) || checkSideColl(currLTop,currLLeft,jpBottom,accuracy) || checkSideColl(currLLeft,currLBottom,jpTop,accuracy) || checkSideColl(currLLeft,currLBottom,jpBottom,accuracy) || checkSideColl(currLBottom,currLRight,jpTop,accuracy) || checkSideColl(currLBottom,currLRight,jpBottom,accuracy) || checkSideColl(currLRight,currLTop,jpTop,accuracy) || checkSideColl(currLRight,currLTop,jpBottom,accuracy))
+            {
+                std::cout << "collided" << count << std::endl;
+                count++;
+                //collided=1;
+                break;
+            }
+        }
+        if(collided==1)
+        {
+            break;
+        }
+
+
+
+
+
+
+
+
+
+
 
 
         // rendering the jetpack-----------------------------------------------------
