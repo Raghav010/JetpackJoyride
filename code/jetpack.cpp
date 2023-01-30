@@ -1,3 +1,6 @@
+// TODO
+// convert object dimensions into variables and replace wherever necessary
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <cmath>
@@ -38,6 +41,16 @@ int render_till=0; // keeps track of which lazer to render till initially, when 
 int destroyLazer=0; // keeps track of which lazer to reuse and generate a new lazer config in its place
 
 
+// for coins // same speed as lazers
+const int coinCount=20; // formula is 2/coin-width //max coins which can fit in the viewport
+glm::mat4 coinConfigs[coinCount];
+float spacingCoinTime=0.5; // formula is coin-width/speed
+float renderCoinTime;
+int render_till_coin=0;
+int destroyCoin=0;
+float coinSeqHeight=0.7;
+float verticalSeqMov=0.1;
+
 
 
 
@@ -57,12 +70,22 @@ const char *lazerVertexShaderSource = "#version 330 core\n"
     "{\n"
     "   gl_Position = lazerMov*lazerConfig*vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
     "}\0";
+const char *coinVertexShaderSource = "#version 330 core\n"
+                                      "layout (location = 0) in vec3 aPos;\n"
+                                      "uniform mat4 coinMov;\n"
+                                      "uniform mat4 coinConfig;\n"
+                                      "void main()\n"
+                                      "{\n"
+                                      "   gl_Position = coinMov*coinConfig*vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+                                      "}\0";
+// redundant coin shader(same as vertex shader)
 //common frag shader for jetpack,lazer,coins etc
 const char *fragmentShaderSource = "#version 330 core\n"
     "out vec4 FragColor;\n"
+    "uniform vec4 ourColor;\n"
     "void main()\n"
     "{\n"
-    "   FragColor = vec4(0.0,1.0,0.0,1.0);\n"
+    "   FragColor = ourColor;\n"
     "}\n\0";
 
 
@@ -170,12 +193,12 @@ void calculateJetpackY(float maxHeight,int upA)
 
     if (curr_y > maxHeight)
     {
-        curr_y = 0.85;
+        curr_y = maxHeight;
         current_speed = 0;
     }
     else if (curr_y < -1*maxHeight)
     {
-        curr_y = -0.85;
+        curr_y = -maxHeight;
         current_speed = 0;
     }
 }
@@ -184,37 +207,81 @@ void calculateJetpackY(float maxHeight,int upA)
 
 
 //generates a random configuration for a lazer and return the config matrix
-glm::mat4 generateRandomConfig()
+// if not erratic generates sequentially wrt coinSeqHeight
+glm::mat4 generateRandomConfig(int rotate,float heightRange,int erratic)
 {
     glm::mat4 randomConfig;
     randomConfig = glm::mat4(1.0f);
-    float vertical_loc = (((float)rand()*0.6) / (RAND_MAX / 2) - 0.6);
-    float rot_angle = glm::radians((float)rand());
+    float vertical_loc;
+
+    if(erratic) // for truly random generation
+    {
+        vertical_loc=(((float)rand()*heightRange) / (RAND_MAX / 2) - heightRange);
+    }
+    else
+    {
+        int verticalDir=(rand() > (RAND_MAX/2))?1:-1; // up or down
+        vertical_loc=coinSeqHeight+(verticalDir*verticalSeqMov);
+        // checking for out of bounds
+        vertical_loc=(vertical_loc > heightRange)?heightRange:vertical_loc;
+        vertical_loc=(vertical_loc < -heightRange)?(-heightRange):vertical_loc;
+
+        coinSeqHeight=vertical_loc;
+    }
     randomConfig = glm::translate(randomConfig, glm::vec3(1.0f, 1.0f * vertical_loc, 0.0f));
-    randomConfig = glm::rotate(randomConfig, rot_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+
+
+
+    if(rotate)
+    {
+        float rot_angle = glm::radians((float)rand());
+        randomConfig = glm::rotate(randomConfig, rot_angle, glm::vec3(0.0f, 0.0f, 1.0f));
+    }
     return randomConfig;
 }
 
 
 
-// keeps the config array updated so the lazer render loop renders the correct lazers
-void updateConfigArray()
+// keeps the config array updated so the lazer/coin render loop renders the correct lazers/coins
+void updateConfigArray(int coin)
 {
-    // taking care of getting the lazerCount lazers on the screen intitially
-    if ((render_till < lazerCount) && ((glfwGetTime() - renderTime) >= spacingTime))
+    if(coin)
     {
-        // making the config matrix
-        configs[render_till] = generateRandomConfig();
-        renderTime = glfwGetTime();
-        render_till++;
+        // taking care of getting the coinCount coins on the screen intitially
+        if ((render_till_coin < coinCount) && ((glfwGetTime() - renderCoinTime) >= spacingCoinTime))
+        {
+            // making the config matrix
+            coinConfigs[render_till_coin] = generateRandomConfig(0,0.8,0);
+            renderCoinTime = glfwGetTime();
+            render_till_coin++;
+        }
+        // the rest of the game
+        else if ((render_till_coin >= coinCount) && ((glfwGetTime() - renderCoinTime) >= spacingCoinTime))
+        {
+            destroyCoin = (destroyCoin % (coinCount));
+            coinConfigs[destroyCoin] = generateRandomConfig(0,0.8,0);
+            renderCoinTime = glfwGetTime();
+            destroyCoin++;
+        }
     }
-    // the rest of the game
-    else if ((render_till >= lazerCount) && ((glfwGetTime() - renderTime) >= spacingTime))
+    else
     {
-        destroyLazer = (destroyLazer % (lazerCount));
-        configs[destroyLazer] = generateRandomConfig();
-        renderTime = glfwGetTime();
-        destroyLazer++;
+        // taking care of getting the lazerCount lazers on the screen intitially
+        if ((render_till < lazerCount) && ((glfwGetTime() - renderTime) >= spacingTime))
+        {
+            // making the config matrix
+            configs[render_till] = generateRandomConfig(1,0.6,1);
+            renderTime = glfwGetTime();
+            render_till++;
+        }
+        // the rest of the game
+        else if ((render_till >= lazerCount) && ((glfwGetTime() - renderTime) >= spacingTime))
+        {
+            destroyLazer = (destroyLazer % (lazerCount));
+            configs[destroyLazer] = generateRandomConfig(1,0.6,1);
+            renderTime = glfwGetTime();
+            destroyLazer++;
+        }
     }
 }
 
@@ -248,6 +315,7 @@ int checkSideColl(glm::vec3 edgePointa,glm::vec3 edgePointb,glm::vec3 colliderPo
 
 int main()
 {
+
     // initialization -------------------------------------------------------------------
     // glfw: initialize and configure
     // ------------------------------
@@ -289,6 +357,7 @@ int main()
     // shaderProgram config
     unsigned int jpShaderProgram=createShadProgram(jetpackVertexShaderSource,fragmentShaderSource);
     unsigned int lazerShaderProgram=createShadProgram(lazerVertexShaderSource,fragmentShaderSource);
+    unsigned int coinShaderProgram=createShadProgram(coinVertexShaderSource,fragmentShaderSource);
 
 
 
@@ -316,6 +385,16 @@ int main()
     unsigned int lazerIndices[] = {  // note that we start from 0!
         0, 1, 3,   // first triangle
         0, 1, 2    // second triangle
+    };
+
+    // coins(triangles)
+    float coinVertices[] = {
+     0.025f,  -0.025f, 0.0f,  // right
+    -0.025f,  -0.025f, 0.0f,   // left
+    0.0f,    0.025f,  0.0f   // top 
+    };
+    unsigned int coinIndices[] = {  // note that we start from 0!
+        0, 1, 2   // first triangle
     };  
 
 
@@ -326,12 +405,18 @@ int main()
     unsigned int jpVAO=createVAO(jetpackVertices,jetpackIndices,0,sizeof(jetpackVertices),sizeof(jetpackIndices));
     //lazer
     unsigned int lazerVAO=createVAO(lazerVertices,lazerIndices,0,sizeof(lazerVertices),sizeof(lazerIndices));
+    //coins
+    unsigned int coinVAO=createVAO(coinVertices,coinIndices,0,sizeof(coinVertices),sizeof(coinIndices));
+
 
 
     // setting some meta data
     last_frame_time_ref=glfwGetTime();
-    srand(10);
+    srand(7);
     renderTime=glfwGetTime();
+    renderCoinTime=renderTime;
+
+
 
     int count=0;
     // render loop
@@ -348,30 +433,61 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         cur_frame_time_ref=glfwGetTime();
 
+
+
+
+
         // check for collisions---------------------------------------------------------
+
         // looping through all rendered lazers
         int collided=0;
         float accuracy=0.001;
-        glm::vec3 jpTop=glm::vec3(-0.7f,curr_y+0.5,0.0f);
-        glm::vec3 jpBottom=glm::vec3(-0.7f,curr_y-0.5,0.0f);
+        glm::vec3 jpTopR=glm::vec3(-0.7f,curr_y+0.05,0.0f);
+        glm::vec3 jpBottomR=glm::vec3(-0.7f,curr_y-0.05,0.0f);
+        glm::vec3 jpTopL=glm::vec3(-0.75f,curr_y+0.05,0.0f); 
+        glm::vec3 jpBottomL=glm::vec3(-0.75f,curr_y-0.05,0.0f); 
         for(int i=0;i<render_till;i++)
         {   
             glm::vec3 currLTop=glm::vec3((configs[i]*glm::vec4(0.0f, 0.4f, 0.0f,1.0f)));
             glm::vec3 currLBottom=glm::vec3((configs[i]*glm::vec4(0.0f, -0.4f, 0.0f,1.0f)));
             glm::vec3 currLRight=glm::vec3((configs[i]*glm::vec4(0.05f,  0.0f, 0.0f,1.0f)));
             glm::vec3 currLLeft=glm::vec3((configs[i]*glm::vec4(-0.05f,  0.0f, 0.0f,1.0f)));
-
-            if(checkSideColl(currLTop,currLLeft,jpTop,accuracy) || checkSideColl(currLTop,currLLeft,jpBottom,accuracy) || checkSideColl(currLLeft,currLBottom,jpTop,accuracy) || checkSideColl(currLLeft,currLBottom,jpBottom,accuracy) || checkSideColl(currLBottom,currLRight,jpTop,accuracy) || checkSideColl(currLBottom,currLRight,jpBottom,accuracy) || checkSideColl(currLRight,currLTop,jpTop,accuracy) || checkSideColl(currLRight,currLTop,jpBottom,accuracy))
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // here
+            if(checkSideColl(currLTop,currLLeft,jpTopR,accuracy) || checkSideColl(currLTop,currLLeft,jpBottomR,accuracy) || checkSideColl(currLLeft,currLBottom,jpTopR,accuracy) || checkSideColl(currLLeft,currLBottom,jpBottomR,accuracy) || checkSideColl(currLBottom,currLRight,jpTopR,accuracy) || checkSideColl(currLBottom,currLRight,jpBottomR,accuracy) || checkSideColl(currLRight,currLTop,jpTopR,accuracy) || checkSideColl(currLRight,currLTop,jpBottomR,accuracy) || checkSideColl(currLTop,currLLeft,jpTopL,accuracy) || checkSideColl(currLTop,currLLeft,jpBottomL,accuracy) || checkSideColl(currLLeft,currLBottom,jpTopL,accuracy) || checkSideColl(currLLeft,currLBottom,jpBottomL,accuracy) || checkSideColl(currLBottom,currLRight,jpTopL,accuracy) || checkSideColl(currLBottom,currLRight,jpBottomL,accuracy) || checkSideColl(currLRight,currLTop,jpTopL,accuracy) || checkSideColl(currLRight,currLTop,jpBottomL,accuracy))
             {
-                std::cout << "collided" << count << std::endl;
-                count++;
-                //collided=1;
+                //std::cout << "collided" << count << std::endl;
+                //count++;
+                collided=1;
                 break;
             }
         }
         if(collided==1)
         {
             break;
+        }
+
+
+        // looping through all rendered coins
+        float jpRightx=-0.7;
+        float jpLeftx=-0.75;
+        float jpTopy=curr_y+0.05;
+        float jpBottomy=curr_y-0.05;
+        for(int i=0;i<render_till_coin;i++)
+        {
+            float coinTopy=(coinConfigs[i]*glm::vec4(0.0f,0.025f,0.0f,1.0f)).y;
+            float coinBottomy=(coinConfigs[i]*glm::vec4(0.0f,-0.025f,0.0f,1.0f)).y;
+            float coinRightx=(coinConfigs[i]*glm::vec4(0.025f,0.0f,0.0f,1.0f)).x;
+            float coinLeftx=(coinConfigs[i]*glm::vec4(-0.025f,0.0f,0.0f,1.0f)).x;
+
+            bool collisionX=((jpRightx > coinLeftx) && (coinRightx > jpLeftx));
+            bool collisionY=((jpTopy > coinBottomy) && (coinTopy > jpBottomy));
+
+            // collision took place
+            if(collisionX && collisionY)
+            {
+                coinConfigs[i]=glm::mat4(1.0f); // indicates it got collected
+                break;
+            }
         }
 
 
@@ -399,6 +515,9 @@ int main()
         unsigned int flyTransLoc=glGetUniformLocation(jpShaderProgram,"flyTrans");
         glUniformMatrix4fv(flyTransLoc,1,GL_FALSE,glm::value_ptr(flyTrans));
 
+        // setting the color
+        unsigned int jpcolorLoc=glGetUniformLocation(jpShaderProgram,"ourColor");
+        glUniform4f(jpcolorLoc,0.0f,1.0f,0.0f,1.0f);
 
         glBindVertexArray(jpVAO); 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -409,7 +528,14 @@ int main()
         // rendering the lazers----------------------------------------------------------
         glUseProgram(lazerShaderProgram);
 
-        updateConfigArray();
+        updateConfigArray(0);
+
+        
+        // setting the color
+        unsigned int lazercolorLoc=glGetUniformLocation(lazerShaderProgram,"ourColor");
+        glUniform4f(lazercolorLoc,1.0f,0.0f,0.0f,1.0f);
+
+
         // rendering all lazers on screen
         for(int i=0;i<render_till;i++)
         {
@@ -425,13 +551,52 @@ int main()
             glUniformMatrix4fv(MovLoc,1,GL_FALSE,glm::value_ptr(lazerMov));
             
 
+
             glBindVertexArray(lazerVAO); 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
             
             configs[i]=lazerMov*configs[i]; // updating configs (wrt to horizontal location)
         }
 
+
+
+        // rendering the coins-----------------------------------------------------------
+        glUseProgram(coinShaderProgram);
+
+        // setting the color
+        unsigned int coincolorLoc=glGetUniformLocation(coinShaderProgram,"ourColor");
+        glUniform4f(coincolorLoc,0.0f,0.0f,1.0f,1.0f);
+
+        updateConfigArray(1);
+        for(int i=0;i<render_till_coin;i++)
+        {
+            if(coinConfigs[i]==glm::mat4(1.0f))
+            {
+                continue;
+            }
+
+            // setting the lazer config
+            unsigned int configLoc=glGetUniformLocation(coinShaderProgram,"coinConfig");
+            glUniformMatrix4fv(configLoc,1,GL_FALSE,glm::value_ptr(coinConfigs[i]));
+
+            // setting the lazer mov matrix
+            float timeDelta=(cur_frame_time_ref-last_frame_time_ref);
+            glm::mat4 coinMov=glm::mat4(1.0f);
+            coinMov=glm::translate(coinMov,glm::vec3(-1.0f*timeDelta*speed,0.0f,0.0f));
+            unsigned int MovLoc=glGetUniformLocation(coinShaderProgram,"coinMov");
+            glUniformMatrix4fv(MovLoc,1,GL_FALSE,glm::value_ptr(coinMov));
+            
+
+            glBindVertexArray(coinVAO); 
+            glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+            
+            coinConfigs[i]=coinMov*coinConfigs[i]; // updating configs (wrt to horizontal location)
+        }
+
  
+
+
+
 
         last_frame_time_ref=cur_frame_time_ref;
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
