@@ -68,9 +68,9 @@ float curr_y=-0.55;
 // for lazers
 float lzLength=0.4; // lazer length
 const int lazerCount=6; // formula for this is (int)2/speed*spacingTime + 1 // max number of lazers that can fit
-float speed=0.4;
+float speed=0.2;
 glm::mat4 configs[lazerCount];
-const int spacingTime=1;  // spacingTime*speed >= length of lazer
+float spacingTime=(lzLength/speed);  // spacingTime*speed >= length of lazer
 float renderTime; // time when the last lazer render happened
 int render_till=0; // keeps track of which lazer to render till initially, when all lazers are not configured
 int destroyLazer=0; // keeps track of which lazer to reuse and generate a new lazer config in its place
@@ -79,7 +79,7 @@ int destroyLazer=0; // keeps track of which lazer to reuse and generate a new la
 // for coins // same speed as lazers
 const int coinCount=40; // formula is 2/coin-width //max coins which can fit in the viewport
 glm::mat4 coinConfigs[coinCount];
-float spacingCoinTime=0.2; // formula is coin-width/speed
+float spacingCoinTime=(0.05/speed)+0.5*(0.05/speed); // formula is coin-width/speed
 float renderCoinTime;
 int render_till_coin=0;
 int destroyCoin=0;
@@ -87,6 +87,12 @@ float coinSeqHeight=0.7;
 float verticalSeqMov=0.1;
 int coinsCollected=0;
 
+// levels
+int level=1;
+float distance=0;
+int frames_for_dist=0;
+float level_start_time;
+int level_duration=30;
 
 // textRendering
 unsigned int textVAO,textVBO;
@@ -565,7 +571,7 @@ int main()
     srand(time(0));
     renderTime=glfwGetTime();
     renderCoinTime=renderTime;
-
+    level_start_time=renderTime;
 
 
     int count=0;
@@ -583,7 +589,15 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         cur_frame_time_ref=glfwGetTime();
 
-
+        // increasing difficulty
+        if((glfwGetTime()-level_start_time) >= level_duration)
+        {
+            level_start_time=glfwGetTime();
+            level++;
+            speed+=0.2;
+            spacingTime=(lzLength/speed);
+            spacingCoinTime=(0.05/speed)+0.5*(0.05/speed);
+        }
 
 
 
@@ -636,7 +650,7 @@ int main()
             if(collisionX && collisionY)
             {
                 coinsCollected++;
-                std::cout << coinsCollected << std::endl;
+                //std::cout << coinsCollected << std::endl;
                 coinConfigs[i]=glm::mat4(1.0f); // indicates it got collected
                 break;
             }
@@ -745,10 +759,24 @@ int main()
             coinConfigs[i]=coinMov*coinConfigs[i]; // updating configs (wrt to horizontal location)
         }
 
- 
+        // updating distance
+        frames_for_dist++;
+        if(frames_for_dist==60)
+        {
+            distance+=(speed*10);
+            frames_for_dist=0;
+        }
+        //distance+=(cur_frame_time_ref-last_frame_time_ref)*speed;
+
+
+
+
+        // rendering text to the screen------------------------------------------------
         glEnable(GL_CULL_FACE);
-        RenderText(textShader, "Welcome to CG Course", 15.0f,450.0f,0.7f, glm::vec3(1.0f));
+        RenderText(textShader, "Score: "+std::to_string(coinsCollected)+"  Level: "+std::to_string(level), 15.0f,450.0f,0.4f, glm::vec3(1.0f));
+        RenderText(textShader, "Distance: "+std::to_string((int)distance), 15.0f,420.0f,0.4f, glm::vec3(1.0f));
         glDisable(GL_CULL_FACE);
+
 
         last_frame_time_ref=cur_frame_time_ref;
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
