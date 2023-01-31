@@ -1,5 +1,12 @@
 // TODO
-// convert object dimensions into variables and replace wherever necessary
+// convert object dimensions into variables and replace wherever necessary ---- done
+// levels --- done
+// text rendering ---- todo
+// if possible : rotating lazers
+// change colors
+
+// increasing difficulty increase speed
+// to increase speed range make lazers smaller
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -24,6 +31,7 @@ const unsigned int SCR_HEIGHT = 500;
 
 // for jetpack 
 float upAcc=0;
+float downAcc=1.6;
 float last_frame_time_ref=0;
 float cur_frame_time_ref=0;
 float current_speed=0;
@@ -32,24 +40,26 @@ float curr_y=-0.55;
 
 
 // for lazers
-const int lazerCount=3; // formula for this is (int)2/speed*spacingTime + 1 // max number of lazers that can fit
-float speed=0.2;
+float lzLength=0.4; // lazer length
+const int lazerCount=6; // formula for this is (int)2/speed*spacingTime + 1 // max number of lazers that can fit
+float speed=0.4;
 glm::mat4 configs[lazerCount];
-const int spacingTime=4;  // spacingTime*speed >= length of lazer
+const int spacingTime=1;  // spacingTime*speed >= length of lazer
 float renderTime; // time when the last lazer render happened
 int render_till=0; // keeps track of which lazer to render till initially, when all lazers are not configured
 int destroyLazer=0; // keeps track of which lazer to reuse and generate a new lazer config in its place
 
 
 // for coins // same speed as lazers
-const int coinCount=20; // formula is 2/coin-width //max coins which can fit in the viewport
+const int coinCount=40; // formula is 2/coin-width //max coins which can fit in the viewport
 glm::mat4 coinConfigs[coinCount];
-float spacingCoinTime=0.5; // formula is coin-width/speed
+float spacingCoinTime=0.2; // formula is coin-width/speed
 float renderCoinTime;
 int render_till_coin=0;
 int destroyCoin=0;
 float coinSeqHeight=0.7;
 float verticalSeqMov=0.1;
+int coinsCollected=0;
 
 
 
@@ -188,7 +198,7 @@ void calculateJetpackY(float maxHeight,int upA)
     {
         upAcc = 0;
     }
-    current_speed += (upAcc - 1) * timeDelta;
+    current_speed += (upAcc - downAcc) * timeDelta;
     curr_y += (current_speed * timeDelta);
 
     if (curr_y > maxHeight)
@@ -220,7 +230,14 @@ glm::mat4 generateRandomConfig(int rotate,float heightRange,int erratic)
     }
     else
     {
-        int verticalDir=(rand() > (RAND_MAX/2))?1:-1; // up or down
+        int verticalDir; // up or down
+        if(rand() < (RAND_MAX*0.4)) // 0.4 probability
+            verticalDir=-1;
+        else if(rand() < (RAND_MAX*0.6)) // 0.2 probability
+            verticalDir=0;
+        else
+            verticalDir=1; // 0.4 probality
+        
         vertical_loc=coinSeqHeight+(verticalDir*verticalSeqMov);
         // checking for out of bounds
         vertical_loc=(vertical_loc > heightRange)?heightRange:vertical_loc;
@@ -379,8 +396,8 @@ int main()
     float lazerVertices[] = {
      0.05f,  0.0f, 0.0f,  // right
      -0.05f, 0.0f, 0.0f,  // left
-    0.0f, 0.4f, 0.0f,  // top
-    0.0f,  -0.4f, 0.0f   // bottom 
+    0.0f, lzLength/2, 0.0f,  // top
+    0.0f,  -lzLength/2, 0.0f   // bottom 
     };
     unsigned int lazerIndices[] = {  // note that we start from 0!
         0, 1, 3,   // first triangle
@@ -412,7 +429,7 @@ int main()
 
     // setting some meta data
     last_frame_time_ref=glfwGetTime();
-    srand(7);
+    srand(time(0));
     renderTime=glfwGetTime();
     renderCoinTime=renderTime;
 
@@ -429,7 +446,7 @@ int main()
 
         // render
         // ------
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         cur_frame_time_ref=glfwGetTime();
 
@@ -448,8 +465,8 @@ int main()
         glm::vec3 jpBottomL=glm::vec3(-0.75f,curr_y-0.05,0.0f); 
         for(int i=0;i<render_till;i++)
         {   
-            glm::vec3 currLTop=glm::vec3((configs[i]*glm::vec4(0.0f, 0.4f, 0.0f,1.0f)));
-            glm::vec3 currLBottom=glm::vec3((configs[i]*glm::vec4(0.0f, -0.4f, 0.0f,1.0f)));
+            glm::vec3 currLTop=glm::vec3((configs[i]*glm::vec4(0.0f, lzLength/2, 0.0f,1.0f)));
+            glm::vec3 currLBottom=glm::vec3((configs[i]*glm::vec4(0.0f, -lzLength/2, 0.0f,1.0f)));
             glm::vec3 currLRight=glm::vec3((configs[i]*glm::vec4(0.05f,  0.0f, 0.0f,1.0f)));
             glm::vec3 currLLeft=glm::vec3((configs[i]*glm::vec4(-0.05f,  0.0f, 0.0f,1.0f)));
                                                                                                                                                                                                                                                                                                                                                                                                                                                                             // here
@@ -485,6 +502,8 @@ int main()
             // collision took place
             if(collisionX && collisionY)
             {
+                coinsCollected++;
+                std::cout << coinsCollected << std::endl;
                 coinConfigs[i]=glm::mat4(1.0f); // indicates it got collected
                 break;
             }
@@ -506,7 +525,7 @@ int main()
         
 
         float flyFactor;
-        calculateJetpackY(0.85,4);
+        calculateJetpackY(0.85,6);
         flyFactor=(curr_y-(-0.55));
 
         // setting the flyTrans matrix
@@ -565,7 +584,7 @@ int main()
 
         // setting the color
         unsigned int coincolorLoc=glGetUniformLocation(coinShaderProgram,"ourColor");
-        glUniform4f(coincolorLoc,0.0f,0.0f,1.0f,1.0f);
+        glUniform4f(coincolorLoc,0.08f,0.95f,0.93f,1.0f);
 
         updateConfigArray(1);
         for(int i=0;i<render_till_coin;i++)
