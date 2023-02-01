@@ -1,7 +1,9 @@
 // TODO
 // convert object dimensions into variables and replace wherever necessary ---- done
 // levels --- done
-// text rendering ---- todo
+// text rendering --- done
+// game over,game start screen
+// change shape of lazer --- done
 // if possible : rotating lazers
 // change colors
 
@@ -57,7 +59,7 @@ std::map<GLchar, Character> Characters;
 
 // for jetpack 
 float upAcc=0;
-float downAcc=1.6;
+float downAcc=2.0;
 float last_frame_time_ref=0;
 float cur_frame_time_ref=0;
 float current_speed=0;
@@ -532,15 +534,27 @@ int main()
     };  
 
     // lazers
+    // float lazerVertices[] = {
+    //  0.05f,  0.0f, 0.0f,  // right
+    //  -0.05f, 0.0f, 0.0f,  // left
+    // 0.0f, lzLength/2, 0.0f,  // top
+    // 0.0f,  -lzLength/2, 0.0f   // bottom 
+    // };
+    // unsigned int lazerIndices[] = {  // note that we start from 0!
+    //     0, 1, 3,   // first triangle
+    //     0, 1, 2    // second triangle
+    // };
+    // budweiser lazers
     float lazerVertices[] = {
-     0.05f,  0.0f, 0.0f,  // right
-     -0.05f, 0.0f, 0.0f,  // left
-    0.0f, lzLength/2, 0.0f,  // top
-    0.0f,  -lzLength/2, 0.0f   // bottom 
+     0.05f,  lzLength/2, 0.0f,  // right top
+     -0.05f, lzLength/2, 0.0f,  // left top
+    0.05f, -lzLength/2, 0.0f,  // right bottom
+    -0.05f,  -lzLength/2, 0.0f,   // left bottom
+    0.0f,   0.0f,       0.0f   // middle
     };
     unsigned int lazerIndices[] = {  // note that we start from 0!
-        0, 1, 3,   // first triangle
-        0, 1, 2    // second triangle
+        0, 1, 4,   // first triangle
+        2, 3, 4    // second triangle
     };
 
     // coins(triangles)
@@ -610,20 +624,31 @@ int main()
         glm::vec3 jpBottomR=glm::vec3(-0.7f,curr_y-0.05,0.0f);
         glm::vec3 jpTopL=glm::vec3(-0.75f,curr_y+0.05,0.0f); 
         glm::vec3 jpBottomL=glm::vec3(-0.75f,curr_y-0.05,0.0f); 
+        glm::vec3 curjpVertices[4]={jpTopR,jpBottomR,jpTopL,jpBottomL}; //makes its easier to check collisons
         for(int i=0;i<render_till;i++)
         {   
-            glm::vec3 currLTop=glm::vec3((configs[i]*glm::vec4(0.0f, lzLength/2, 0.0f,1.0f)));
-            glm::vec3 currLBottom=glm::vec3((configs[i]*glm::vec4(0.0f, -lzLength/2, 0.0f,1.0f)));
-            glm::vec3 currLRight=glm::vec3((configs[i]*glm::vec4(0.05f,  0.0f, 0.0f,1.0f)));
-            glm::vec3 currLLeft=glm::vec3((configs[i]*glm::vec4(-0.05f,  0.0f, 0.0f,1.0f)));
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // here
-            if(checkSideColl(currLTop,currLLeft,jpTopR,accuracy) || checkSideColl(currLTop,currLLeft,jpBottomR,accuracy) || checkSideColl(currLLeft,currLBottom,jpTopR,accuracy) || checkSideColl(currLLeft,currLBottom,jpBottomR,accuracy) || checkSideColl(currLBottom,currLRight,jpTopR,accuracy) || checkSideColl(currLBottom,currLRight,jpBottomR,accuracy) || checkSideColl(currLRight,currLTop,jpTopR,accuracy) || checkSideColl(currLRight,currLTop,jpBottomR,accuracy) || checkSideColl(currLTop,currLLeft,jpTopL,accuracy) || checkSideColl(currLTop,currLLeft,jpBottomL,accuracy) || checkSideColl(currLLeft,currLBottom,jpTopL,accuracy) || checkSideColl(currLLeft,currLBottom,jpBottomL,accuracy) || checkSideColl(currLBottom,currLRight,jpTopL,accuracy) || checkSideColl(currLBottom,currLRight,jpBottomL,accuracy) || checkSideColl(currLRight,currLTop,jpTopL,accuracy) || checkSideColl(currLRight,currLTop,jpBottomL,accuracy))
+            // glm::vec3 currLTop=glm::vec3((configs[i]*glm::vec4(0.0f, lzLength/2, 0.0f,1.0f)));
+            // glm::vec3 currLBottom=glm::vec3((configs[i]*glm::vec4(0.0f, -lzLength/2, 0.0f,1.0f)));
+            // glm::vec3 currLRight=glm::vec3((configs[i]*glm::vec4(0.05f,  0.0f, 0.0f,1.0f)));
+            // glm::vec3 currLLeft=glm::vec3((configs[i]*glm::vec4(-0.05f,  0.0f, 0.0f,1.0f)));
+            glm::vec3 currLTopR=glm::vec3((configs[i]*glm::vec4(0.05f, lzLength/2, 0.0f,1.0f)));
+            glm::vec3 currLTopL=glm::vec3((configs[i]*glm::vec4(-0.05f, lzLength/2, 0.0f,1.0f)));
+            glm::vec3 currLBottomR=glm::vec3((configs[i]*glm::vec4(0.05f, -lzLength/2, 0.0f,1.0f)));
+            glm::vec3 currLBottomL=glm::vec3((configs[i]*glm::vec4(-0.05f, -lzLength/2, 0.0f,1.0f)));
+            glm::vec3 currLMiddle=glm::vec3((configs[i]*glm::vec4(0.0f, 0.0f, 0.0f,1.0f)));
+            glm::vec3 curlzrVertices[5]={currLTopR,currLTopL,currLMiddle,currLBottomL,currLBottomR};              
+            
+            for(int j=0;j<4;j++)
             {
-                //std::cout << "collided" << count << std::endl;
-                //count++;
-                collided=1;
-                break;
+                for(int k=0;k<5;k++)
+                {
+                    collided=(collided || checkSideColl(curlzrVertices[k],curlzrVertices[(k+1)%5],curjpVertices[j],accuracy));
+                }
             }
+            if(collided==1)
+            {
+                break;
+            }                                                                                                                                                                                                                                                                                                                                       
         }
         if(collided==1)
         {
