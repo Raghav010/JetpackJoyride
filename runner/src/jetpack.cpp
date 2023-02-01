@@ -89,12 +89,15 @@ float coinSeqHeight=0.7;
 float verticalSeqMov=0.1;
 int coinsCollected=0;
 
-// levels
+// HUD
 int level=1;
 float distance=0;
 int frames_for_dist=0;
 float level_start_time;
 int level_duration=30;
+int max_level=3; 
+const float level_disp_time=1.5;
+const float gm_over_time=6;
 
 // textRendering
 unsigned int textVAO,textVBO;
@@ -432,7 +435,7 @@ int main()
     }
 
 	// find path to font
-    std::string font_name = "../fonts/Antonio-Bold.ttf";
+    std::string font_name = "../fonts/slkscr.ttf";
     if (font_name.empty())
     {
         std::cout << "ERROR::FREETYPE: Failed to load font_name" << std::endl;
@@ -603,15 +606,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
         cur_frame_time_ref=glfwGetTime();
 
-        // increasing difficulty
-        if((glfwGetTime()-level_start_time) >= level_duration)
-        {
-            level_start_time=glfwGetTime();
-            level++;
-            speed+=0.2;
-            spacingTime=(lzLength/speed);
-            spacingCoinTime=(0.05/speed)+0.5*(0.05/speed);
-        }
+    
 
 
 
@@ -682,6 +677,32 @@ int main()
         }
 
 
+
+
+
+
+        // increasing difficulty
+        if((glfwGetTime()-level_start_time) >= level_duration)
+        {
+            level_start_time=glfwGetTime();
+            level++;
+            speed+=0.2;
+            spacingTime=(lzLength/speed);
+            spacingCoinTime=(0.05/speed)+0.5*(0.05/speed);
+
+            //exiting if max level has been reached
+            if(level==(max_level+1))
+            {
+                break;
+            }
+        }
+        // displaying the level
+        if((glfwGetTime()-level_start_time)<=level_disp_time)
+        {
+            glEnable(GL_CULL_FACE);
+            RenderText(textShader, "LEVEL "+std::to_string(level), 350.0f,230.0f,2.0f, glm::vec3(1.0f));
+            glDisable(GL_CULL_FACE);
+        }
 
 
 
@@ -798,8 +819,8 @@ int main()
 
         // rendering text to the screen------------------------------------------------
         glEnable(GL_CULL_FACE);
-        RenderText(textShader, "Score: "+std::to_string(coinsCollected)+"  Level: "+std::to_string(level), 15.0f,450.0f,0.4f, glm::vec3(1.0f));
-        RenderText(textShader, "Distance: "+std::to_string((int)distance), 15.0f,420.0f,0.4f, glm::vec3(1.0f));
+        RenderText(textShader, "Score: "+std::to_string(coinsCollected)+"  Level: "+std::to_string(level), 10.0f,460.0f,0.4f, glm::vec3(1.0f));
+        RenderText(textShader, "Distance: "+std::to_string((int)distance), 10.0f,430.0f,0.4f, glm::vec3(1.0f));
         glDisable(GL_CULL_FACE);
 
 
@@ -810,6 +831,42 @@ int main()
         glfwPollEvents();
     }
 
+
+
+
+    float gm_over_start=glfwGetTime();
+
+    // game over screen
+    while (!glfwWindowShouldClose(window))
+    {
+
+        // input
+        // -----
+        processInput(window);
+
+        // render
+        // ------
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+
+        glEnable(GL_CULL_FACE);
+        RenderText(textShader, "GAME OVER", 250.0f,230.0f,2.5f, glm::vec3(1.0f));
+        RenderText(textShader, "Score: "+std::to_string(coinsCollected) + " Level: "+std::to_string(level), 450.0f,170.0f,0.6f, glm::vec3(1.0f));
+        glDisable(GL_CULL_FACE);
+
+        if((glfwGetTime()-gm_over_start)>=gm_over_time)
+        {
+            break;
+        }
+
+        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+        // -------------------------------------------------------------------------------
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
     //glDeleteVertexArrays(1, &VAO);
