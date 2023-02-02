@@ -2,8 +2,9 @@
 // convert object dimensions into variables and replace wherever necessary ---- done
 // levels --- done
 // text rendering --- done
-// game over,game start screen
+// game over,game start screen --- done
 // change shape of lazer --- done
+// improve the randomized coin path
 // if possible : rotating lazers
 // change colors
 
@@ -58,7 +59,7 @@ std::map<GLchar, Character> Characters;
 // variables to keep track of -------------------------------------
 
 // for jetpack 
-float upAcc=0;
+float upAcc=6;
 float downAcc=2.0;
 float last_frame_time_ref=0;
 float cur_frame_time_ref=0;
@@ -95,7 +96,7 @@ float distance=0;
 int frames_for_dist=0;
 float level_start_time;
 int level_duration=30;
-int max_level=3; 
+int max_level=5; 
 const float level_disp_time=1.5;
 const float gm_over_time=6;
 
@@ -227,18 +228,19 @@ unsigned int createVAO(float* vertices,unsigned int* indices,int vertexAtrribLoc
 
 
 // calculates the jetpacks current y-position,takes care of height bounding
-void calculateJetpackY(float maxHeight,int upA)
+void calculateJetpackY(float maxHeight)
 {
+    float upA;
     float timeDelta = (cur_frame_time_ref - last_frame_time_ref);
     if (fly)
     {
-        upAcc = upA;
+        upA = upAcc;
     }
     else
     {
-        upAcc = 0;
+        upA = 0;
     }
-    current_speed += (upAcc - downAcc) * timeDelta;
+    current_speed += (upA - downAcc) * timeDelta;
     curr_y += (current_speed * timeDelta);
 
     if (curr_y > maxHeight)
@@ -690,6 +692,11 @@ int main()
             spacingTime=(lzLength/speed);
             spacingCoinTime=(0.05/speed)+0.5*(0.05/speed);
 
+            // changing jetpack speed, since speed changed
+            int diff=upAcc-downAcc;
+            downAcc++;
+            upAcc=(diff+1)+downAcc;
+
             //exiting if max level has been reached
             if(level==(max_level+1))
             {
@@ -718,7 +725,7 @@ int main()
         
 
         float flyFactor;
-        calculateJetpackY(0.85,6);
+        calculateJetpackY(0.85);
         flyFactor=(curr_y-(-0.55));
 
         // setting the flyTrans matrix
