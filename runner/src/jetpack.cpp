@@ -77,6 +77,7 @@ float spacingTime=(lzLength/speed);  // spacingTime*speed >= length of lazer
 float renderTime; // time when the last lazer render happened
 int render_till=0; // keeps track of which lazer to render till initially, when all lazers are not configured
 int destroyLazer=0; // keeps track of which lazer to reuse and generate a new lazer config in its place
+int collided=0; // indicates if jetpack collided with lazer
 
 
 // for coins // same speed as lazers
@@ -96,12 +97,13 @@ float distance=0;
 int frames_for_dist=0;
 float level_start_time;
 int level_duration=30;
-int max_level=5; 
+int max_level=3; 
 const float level_disp_time=1.5;
 const float gm_over_time=6;
 
 // textRendering
 unsigned int textVAO,textVBO;
+
 
 
 
@@ -117,9 +119,11 @@ const char *lazerVertexShaderSource = "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
     "uniform mat4 lazerMov;\n"
     "uniform mat4 lazerConfig;\n"
+    "out vec3 vPos;\n"  // vec3 or vec4
     "void main()\n"
     "{\n"
     "   gl_Position = lazerMov*lazerConfig*vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+    "   vPos = aPos;\n"
     "}\0";
 const char *coinVertexShaderSource = "#version 330 core\n"
                                       "layout (location = 0) in vec3 aPos;\n"
@@ -132,12 +136,32 @@ const char *coinVertexShaderSource = "#version 330 core\n"
 // redundant coin shader(same as vertex shader)
 //common frag shader for jetpack,lazer,coins etc
 const char *fragmentShaderSource = "#version 330 core\n"
+    "in vec3 vPos;\n"
     "out vec4 FragColor;\n"
     "uniform vec4 ourColor;\n"
+    "uniform float lazerGlow;\n"
     "void main()\n"
     "{\n"
-    "   FragColor = ourColor;\n"
+    "   float op;"
+    "   if(vPos.x >= 0)\n"
+    "   {\n"
+    "       op=distance(vPos,vec3(0.05,0.0,0.0));\n"
+    "   }\n"
+    "   else\n"
+    "   {\n"
+    "       op=distance(vPos,vec3(-0.05,0.0,0.0));\n"
+    "   }\n"
+    "   if(lazerGlow==1.0)\n"
+    "   {\n"
+    "       FragColor=vec4(ourColor.xyz,(1-smoothstep(0.0,0.3,op)));\n" 
+    "   }\n" 
+    "   else\n"
+    "   {\n"
+    "       FragColor = ourColor;\n"
+    "   }\n"
     "}\n\0";
+
+
 
 
 
@@ -615,7 +639,6 @@ int main()
         // check for collisions---------------------------------------------------------
 
         // looping through all rendered lazers
-        int collided=0;
         float accuracy=0.001;
         glm::vec3 jpTopR=glm::vec3(-0.7f,curr_y+0.05,0.0f);
         glm::vec3 jpBottomR=glm::vec3(-0.7f,curr_y-0.05,0.0f);
@@ -713,9 +736,7 @@ int main()
 
 
 
-
-
-
+        
 
 
 
@@ -738,6 +759,10 @@ int main()
         unsigned int jpcolorLoc=glGetUniformLocation(jpShaderProgram,"ourColor");
         glUniform4f(jpcolorLoc,0.0f,1.0f,0.0f,1.0f);
 
+        // switching off glow
+        unsigned int jpGlowLoc=glGetUniformLocation(jpShaderProgram,"lazerGlow");
+        glUniform1f(jpGlowLoc,0.0f);
+
         glBindVertexArray(jpVAO); 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
@@ -753,6 +778,10 @@ int main()
         // setting the color
         unsigned int lazercolorLoc=glGetUniformLocation(lazerShaderProgram,"ourColor");
         glUniform4f(lazercolorLoc,1.0f,0.0f,0.0f,1.0f);
+
+        // switching on glow
+        unsigned int glowLoc=glGetUniformLocation(lazerShaderProgram,"lazerGlow");
+        glUniform1f(glowLoc,1.0f);
 
 
         // rendering all lazers on screen
@@ -779,12 +808,17 @@ int main()
 
 
 
+
         // rendering the coins-----------------------------------------------------------
         glUseProgram(coinShaderProgram);
 
         // setting the color
         unsigned int coincolorLoc=glGetUniformLocation(coinShaderProgram,"ourColor");
         glUniform4f(coincolorLoc,0.08f,0.95f,0.93f,1.0f);
+
+        // switching off glow
+        unsigned int coinGlowLoc=glGetUniformLocation(coinShaderProgram,"lazerGlow");
+        glUniform1f(coinGlowLoc,0.0f);
 
         updateConfigArray(1);
         for(int i=0;i<render_till_coin;i++)
@@ -841,6 +875,7 @@ int main()
 
 
 
+    // rendering the game over screen-------------------------------------------------
     float gm_over_start=glfwGetTime();
 
     // game over screen
@@ -858,8 +893,12 @@ int main()
 
 
         glEnable(GL_CULL_FACE);
+        if(collided==1)
+            RenderText(textShader, "You Lose", 550.0f,350.0f,0.5f, glm::vec3(1.0f));
+        else
+            RenderText(textShader, "You Win !", 550.0f,350.0f,0.5f, glm::vec3(1.0f));        
         RenderText(textShader, "GAME OVER", 250.0f,230.0f,2.5f, glm::vec3(1.0f));
-        RenderText(textShader, "Score: "+std::to_string(coinsCollected) + " Level: "+std::to_string(level), 450.0f,170.0f,0.6f, glm::vec3(1.0f));
+        RenderText(textShader, "Score: "+std::to_string(coinsCollected) + " Level: "+std::to_string(level), 470.0f,170.0f,0.6f, glm::vec3(1.0f));
         glDisable(GL_CULL_FACE);
 
         if((glfwGetTime()-gm_over_start)>=gm_over_time)
